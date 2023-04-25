@@ -1,1 +1,1 @@
-web: ./api/target/universal/stage/bin/faisal-helper-api
+web: ./target/universal/stage/bin/faisal-helper

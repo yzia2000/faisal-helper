@@ -2,17 +2,22 @@ import org.scalajs.linker.interface.ModuleSplitStyle
 
 ThisBuild / scalaVersion := "3.2.2"
 ThisBuild / fork := true
-Global / cancelable := true
 ThisBuild / connectInput := true
 
+Global / cancelable := true
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
+Compile / mainClass := Some("faisalHelper.api.Main")
+
 lazy val root = project
+  .in(file("."))
+  .enablePlugins(JavaAppPackaging)
   .settings(
     name := "faisal-helper",
     version := "0.1.0-SNAPSHOT"
   )
   .aggregate(shared, api, web)
+  .dependsOn(shared, api, web)
 
 lazy val api = project
   .in(file("api"))
