@@ -1,12 +1,12 @@
 import org.scalajs.linker.interface.ModuleSplitStyle
 
 ThisBuild / scalaVersion := "3.2.2"
-ThisBuild / fork := true
 ThisBuild / connectInput := true
 
 Global / cancelable := true
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
+Compile / run / fork := true
 Compile / mainClass := Some("faisalHelper.api.Main")
 
 lazy val root = project
