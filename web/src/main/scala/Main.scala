@@ -1,22 +1,29 @@
 package faisalHelper.web
 
 import org.scalajs.dom
+import scala.scalajs.js
 import com.raquo.laminar.api.L.{*, given}
 import faisalHelper.shared.GeneratorInput
 import faisalHelper.shared.CsvInputReader
-import io.laminext.fetch.Fetch
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.scalajs.dom.Response
 import faisalHelper.shared.EmailDto
 import zio.json._
 import faisalHelper.shared.TemplateInput
 import faisalHelper.shared.Auth
+import org.scalajs.dom.File
+import org.scalajs.dom.html
 
-val subjectTemplate = Var(initial = "")
-val bodyTemplate = Var(initial = "")
-val recipients = Var[List[GeneratorInput]](initial = List())
-val email = Var(initial = "")
-val password = Var(initial = "")
+lazy val subjectTemplate = Var(initial = "")
+lazy val bodyTemplate = Var(initial = "")
+lazy val recipients = Var[List[GeneratorInput]](initial = List())
+lazy val email = Var(initial = "")
+lazy val password = Var(initial = "")
+
+lazy val apiUrl: String =
+  js.`import`.meta.env.VITE_API_URL
+    .asInstanceOf[js.UndefOr[String]]
+    .getOrElse("http://localhost:8080")
 
 def getEmailDto = EmailDto(
   recipients.now(),
@@ -29,33 +36,50 @@ def getEmailDto = EmailDto(
 
 def fetchObserver = Observer[String](result => dom.window.alert(result))
 
+def parseFile(e: dom.Event): EventStream[String] = {
+  e.target match {
+    case req: html.Input if req.files.size > 0 =>
+      EventStream
+        .fromJsPromise(req.files.head.text())
+    case _ =>
+      EventStream.empty
+  }
+}
+
+def logger[A]: Observer[A] = Observer[A](msg => dom.console.log(msg.toString))
+
 def makeRequest(data: EmailDto) = {
   AjaxStream
-    .post("http://localhost:8080/email", data = data.toJson)
+    .post(
+      apiUrl + "/email",
+      data = data.toJson
+    )
     .map(_.response.toString)
 }
 
-val rootElement = div(
-  textArea(
-    onMountFocus,
-    placeholder := "Enter list of recipients in csv format of name,company,email",
-    onInput.mapToValue.map(CsvInputReader.parseInput) --> recipients
+lazy val rootElement = div(
+  span("Recipients CSV: "),
+  input(
+    `type` := "file",
+    onChange.flatMapStream(
+      parseFile(_).map(CsvInputReader.parseInput)
+    ) --> logger
   ),
   br(),
   textArea(
     onMountFocus,
-    placeholder := "Enter template of subject eg Hi ${name}",
+    placeholder := "Enter template of subject eg:\nHi ${name}",
     onInput.mapToValue --> subjectTemplate
   ),
   br(),
   textArea(
     onMountFocus,
-    placeholder := "Enter template of body eg Hi ${name} from ${company}. Would like to connect with you",
+    placeholder := "Enter template of body eg:\nHi ${name} from ${company}. Would like to connect with you",
     onInput.mapToValue --> bodyTemplate
   ),
   br(),
   span(
-    "Number of recipients",
+    "Number of recipients: ",
     child.text <-- recipients.signal.map(_.size)
   ),
   br(),

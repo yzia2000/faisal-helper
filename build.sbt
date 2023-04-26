@@ -52,18 +52,17 @@ lazy val web = project
   .settings(
     name := "faisal-helper-web",
     scalaJSUseMainModuleInitializer := true,
+    scalaJSLinkerConfig ~= { _.withSourceMap(false) },
     scalaJSLinkerConfig ~= {
       _.withModuleKind(ModuleKind.ESModule)
         .withModuleSplitStyle(
-          ModuleSplitStyle.SmallModulesFor(List("faisalHelper.web"))
+          ModuleSplitStyle.SmallestModules
         )
     },
     libraryDependencies ++= Seq(
       "dev.zio" %%% "zio-json" % "0.5.0",
       "com.raquo" %%% "laminar" % "15.0.1",
-      "org.scala-js" %%% "scalajs-dom" % "2.4.0",
-      "io.laminext" %%% "core" % "0.15.0",
-      "io.laminext" %%% "fetch" % "0.15.0"
+      "org.scala-js" %%% "scalajs-dom" % "2.4.0"
     )
   )
   .dependsOn(shared)
