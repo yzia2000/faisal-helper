@@ -3,14 +3,22 @@ package faisalHelper.shared
 import zio._
 import zio.json._
 
-case class TemplateInput(
-    bodyTemplate: String,
-    subjectTemplate: String
+case class Auth(email: String, password: String)
+
+object Auth {
+  given JsonDecoder[Auth] = DeriveJsonDecoder.gen[Auth]
+  given JsonEncoder[Auth] = DeriveJsonEncoder.gen[Auth]
+}
+
+case class SendEmailDto(
+    recipients: List[GeneratorInput],
+    templateInput: TemplateInput,
+    auth: Auth
 )
 
-object TemplateInput {
-  given JsonDecoder[TemplateInput] = DeriveJsonDecoder.gen[TemplateInput]
-  given JsonEncoder[TemplateInput] = DeriveJsonEncoder.gen[TemplateInput]
+object SendEmailDto {
+  given JsonDecoder[SendEmailDto] = DeriveJsonDecoder.gen[SendEmailDto]
+  given JsonEncoder[SendEmailDto] = DeriveJsonEncoder.gen[SendEmailDto]
 }
 
 case class GeneratorInput(
@@ -24,24 +32,14 @@ object GeneratorInput {
   given JsonEncoder[GeneratorInput] = DeriveJsonEncoder.gen[GeneratorInput]
 }
 
-case class Email(to: String, subject: String, body: String)
-
-case class Auth(email: String, password: String)
-
-object Auth {
-  given JsonDecoder[Auth] = DeriveJsonDecoder.gen[Auth]
-  given JsonEncoder[Auth] = DeriveJsonEncoder.gen[Auth]
-}
-
-case class EmailDto(
-    recipients: List[GeneratorInput],
-    templateInput: TemplateInput,
-    auth: Auth
+case class TemplateInput(
+    bodyTemplate: String,
+    subjectTemplate: String
 )
 
-object EmailDto {
-  given JsonDecoder[EmailDto] = DeriveJsonDecoder.gen[EmailDto]
-  given JsonEncoder[EmailDto] = DeriveJsonEncoder.gen[EmailDto]
+object TemplateInput {
+  given JsonDecoder[TemplateInput] = DeriveJsonDecoder.gen[TemplateInput]
+  given JsonEncoder[TemplateInput] = DeriveJsonEncoder.gen[TemplateInput]
 }
 
 object CsvInputReader {
@@ -59,3 +57,5 @@ object CsvInputReader {
       .toList
   }
 }
+
+case class Email(to: String, subject: String, body: String)

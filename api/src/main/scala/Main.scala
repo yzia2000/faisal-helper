@@ -1,5 +1,6 @@
 package faisalHelper.api
 
+import faisalHelper.shared.*
 import jakarta.mail.Authenticator
 import jakarta.mail.Message
 import jakarta.mail.PasswordAuthentication
@@ -8,11 +9,10 @@ import jakarta.mail.Transport
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
 import zio.*
-import zio.http.*
 import zio.http.HttpAppMiddleware.*
+import zio.http.*
 import zio.json.*
 import zio.stream.*
-import faisalHelper.shared.*
 
 import java.util.Properties
 
@@ -47,7 +47,7 @@ object GmailEmailSender {
       *> ZIO.logInfo(s"Successfully sent email to ${email.to}")
   }
 
-  def processEmails(input: EmailDto): ZIO[Any, Throwable, Unit] = {
+  def processEmails(input: SendEmailDto): ZIO[Any, Throwable, Unit] = {
     for {
       _ <- ZIO.unit
       session = makeSession(input.auth)
@@ -58,10 +58,10 @@ object GmailEmailSender {
   }
 
   def queueEmail(
-      emails: EmailDto
-  ): ZIO[Queue[EmailDto], Throwable, Unit] = {
+      emails: SendEmailDto
+  ): ZIO[Queue[SendEmailDto], Throwable, Unit] = {
     for {
-      queue <- ZIO.service[Queue[EmailDto]]
+      queue <- ZIO.service[Queue[SendEmailDto]]
       _ <- queue.offer(emails)
     } yield ()
   }
@@ -90,25 +90,27 @@ object GmailEmailSender {
   }
 
   def emailProcessor = for {
-    queue <- ZIO.service[Queue[EmailDto]]
+    queue <- ZIO.service[Queue[SendEmailDto]]
     // TODO: add retry support
     _ <- ZStream
       .fromQueue(queue)
       .foreach(processEmails)
   } yield ()
 
-  def queueLayer = ZLayer.fromZIO(Queue.bounded[EmailDto](10))
+  def queueLayer = ZLayer.fromZIO(Queue.bounded[SendEmailDto](10))
 }
 
 object Api {
+  import Endpoints._
+
   // TODO: persist emails scheduled in a database so that user
   // can see which emails were sent in the past and which ones weren't.
-  val app: App[Queue[EmailDto]] =
+  val app: App[Queue[SendEmailDto]] =
     Http.collectZIO[Request] {
-      case req @ Method.POST -> !! / "email" =>
+      case req @ Method.POST -> !! / Endpoints.Email.sendEmail =>
         for {
           input <- req.body.asString
-            .flatMap(data => ZIO.fromEither(data.fromJson[EmailDto]))
+            .flatMap(data => ZIO.fromEither(data.fromJson[SendEmailDto]))
             .mapError(err =>
               Response.text(s"Failed to decode body json ${err}")
             )

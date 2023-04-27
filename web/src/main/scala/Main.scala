@@ -1,18 +1,22 @@
 package faisalHelper.web
 
-import org.scalajs.dom
-import scala.scalajs.js
-import com.raquo.laminar.api.L.{*, given}
-import faisalHelper.shared.GeneratorInput
-import faisalHelper.shared.CsvInputReader
-import scala.concurrent.ExecutionContext.Implicits.global
-import org.scalajs.dom.Response
-import faisalHelper.shared.EmailDto
-import zio.json._
-import faisalHelper.shared.TemplateInput
+import com.raquo.laminar.api.L.{_, given}
 import faisalHelper.shared.Auth
+import faisalHelper.shared.CsvInputReader
+import faisalHelper.shared.GeneratorInput
+import faisalHelper.shared.SendEmailDto
+import faisalHelper.shared.TemplateInput
+import org.scalajs.dom
 import org.scalajs.dom.File
+import org.scalajs.dom.Response
 import org.scalajs.dom.html
+import zio.json._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.scalajs.js
+import faisalHelper.shared.Endpoints.ApiUrlPrefix
+import faisalHelper.shared.Endpoints.getUrl
+import faisalHelper.shared.Endpoints
 
 lazy val subjectTemplate = Var(initial = "")
 lazy val bodyTemplate = Var(initial = "")
@@ -20,12 +24,14 @@ lazy val recipients = Var[List[GeneratorInput]](initial = List())
 lazy val email = Var(initial = "")
 lazy val password = Var(initial = "")
 
-lazy val apiUrl: String =
-  js.`import`.meta.env.VITE_API_URL
-    .asInstanceOf[js.UndefOr[String]]
-    .getOrElse("http://localhost:8080")
+val defaultApiUrl: ApiUrlPrefix = ApiUrlPrefix("http://localhost:8080")
 
-def getEmailDto = EmailDto(
+given ApiUrlPrefix =
+  js.`import`.meta.env.VITE_API_URL
+    .asInstanceOf[js.UndefOr[ApiUrlPrefix]]
+    .getOrElse(defaultApiUrl)
+
+def getEmailDto = SendEmailDto(
   recipients.now(),
   TemplateInput(
     subjectTemplate = subjectTemplate.now(),
@@ -39,8 +45,10 @@ def fetchObserver = Observer[String](result => dom.window.alert(result))
 def parseFile(e: dom.Event): EventStream[String] = {
   e.target match {
     case req: html.Input if req.files.size > 0 =>
-      EventStream
+      val stream = EventStream
         .fromJsPromise(req.files.head.text())
+      req.value = ""
+      stream
     case _ =>
       EventStream.empty
   }
@@ -48,10 +56,10 @@ def parseFile(e: dom.Event): EventStream[String] = {
 
 def logger[A]: Observer[A] = Observer[A](msg => dom.console.log(msg.toString))
 
-def makeRequest(data: EmailDto) = {
+def makeRequest(data: SendEmailDto) = {
   AjaxStream
     .post(
-      apiUrl + "/email",
+      Endpoints.Email.sendEmail.getUrl,
       data = data.toJson
     )
     .map(_.response.toString)
@@ -61,9 +69,9 @@ lazy val rootElement = div(
   span("Recipients CSV: "),
   input(
     `type` := "file",
-    onChange.flatMapStream(
+    onInput.flatMapStream(
       parseFile(_).map(CsvInputReader.parseInput)
-    ) --> logger
+    ) --> recipients
   ),
   br(),
   textArea(
