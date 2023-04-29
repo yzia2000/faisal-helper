@@ -3,6 +3,9 @@ package faisalHelper.web
 import com.raquo.laminar.api.L.{_, given}
 import faisalHelper.shared.Auth
 import faisalHelper.shared.CsvInputReader
+import faisalHelper.shared.Endpoints
+import faisalHelper.shared.Endpoints.ApiUrlPrefix
+import faisalHelper.shared.Endpoints.getUrl
 import faisalHelper.shared.GeneratorInput
 import faisalHelper.shared.SendEmailDto
 import faisalHelper.shared.TemplateInput
@@ -14,9 +17,6 @@ import zio.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.scalajs.js
-import faisalHelper.shared.Endpoints.ApiUrlPrefix
-import faisalHelper.shared.Endpoints.getUrl
-import faisalHelper.shared.Endpoints
 
 lazy val subjectTemplate = Var(initial = "")
 lazy val bodyTemplate = Var(initial = "")
@@ -47,7 +47,6 @@ def parseFile(e: dom.Event): EventStream[String] = {
     case req: html.Input if req.files.size > 0 =>
       val stream = EventStream
         .fromJsPromise(req.files.head.text())
-      req.value = ""
       stream
     case _ =>
       EventStream.empty
@@ -66,44 +65,84 @@ def makeRequest(data: SendEmailDto) = {
 }
 
 lazy val rootElement = div(
-  span("Recipients CSV: "),
-  input(
-    `type` := "file",
-    onInput.flatMapStream(
-      parseFile(_).map(CsvInputReader.parseInput)
-    ) --> recipients
-  ),
-  br(),
-  textArea(
-    onMountFocus,
-    placeholder := "Enter template of subject eg:\nHi ${name}",
-    onInput.mapToValue --> subjectTemplate
-  ),
-  br(),
-  textArea(
-    onMountFocus,
-    placeholder := "Enter template of body eg:\nHi ${name} from ${company}. Would like to connect with you",
-    onInput.mapToValue --> bodyTemplate
-  ),
-  br(),
-  span(
-    "Number of recipients: ",
-    child.text <-- recipients.signal.map(_.size)
-  ),
-  br(),
-  input(
-    placeholder := "Email",
-    `type` := "email",
-    onInput.mapToValue --> email
-  ),
-  input(
-    placeholder := "App password",
-    `type` := "password",
-    onInput.mapToValue --> password
-  ),
-  button(
-    "Submit",
-    onClick.flatMap(_ => makeRequest(getEmailDto)) --> fetchObserver
+  className := "container mx-auto",
+  div(
+    className := "flex flex-col",
+    div(
+      className := "form-control",
+      label(
+        className := "label",
+        span(className := "label-text", "Recipients CSV"),
+        input(
+          `type` := "file",
+          className := "file-input file-input-md",
+          onInput.flatMapStream(
+            parseFile(_).map(CsvInputReader.parseInput)
+          ) --> recipients
+        ),
+        span(
+          "Number of recipients: ",
+          child.text <-- recipients.signal.map(_.size)
+        )
+      )
+    ),
+    div(
+      className := "form-control",
+      label(
+        className := "label",
+        span(className := "label-text", "Subject Template"),
+        textArea(
+          onMountFocus,
+          className := "textarea textarea-bordered textarea-md w-3/4",
+          placeholder := "Enter template of subject eg:\nHi ${name}",
+          onInput.mapToValue --> subjectTemplate
+        )
+      )
+    ),
+    div(
+      className := "form-control",
+      label(
+        className := "label",
+        span(className := "label-text", "Body Template"),
+        textArea(
+          onMountFocus,
+          className := "textarea textarea-bordered textarea-md w-3/4",
+          placeholder := "Enter template of body eg:\nHi ${name} from ${company}. Would like to connect with you",
+          onInput.mapToValue --> bodyTemplate
+        )
+      )
+    ),
+    div(
+      className := "form-control",
+      label(
+        className := "label",
+        span(className := "label-text", "Email"),
+        input(
+          placeholder := "john@doe.com",
+          `type` := "email",
+          className := "input input-bordered input-md w-1/2",
+          onInput.mapToValue --> email
+        )
+      )
+    ),
+    div(
+      className := "form-control",
+      label(
+        className := "label",
+        span(className := "label-text", "Password"),
+        input(
+          placeholder := "********",
+          `type` := "password",
+          className := "input input-bordered input-md w-1/2",
+          onInput.mapToValue --> password
+        )
+      )
+    ),
+    button(
+      "Submit",
+      className := "btn",
+      onClick.flatMap(_ => makeRequest(getEmailDto)) --> fetchObserver
+    )
   )
 )
 
