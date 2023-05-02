@@ -3,7 +3,7 @@ package faisalHelper.shared
 import zio._
 import zio.json._
 
-case class Auth(email: String, password: String)
+case class Auth(accessToken: String)
 
 object Auth {
   given JsonDecoder[Auth] = DeriveJsonDecoder.gen[Auth]
