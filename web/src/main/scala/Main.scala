@@ -15,6 +15,8 @@ import org.scalajs.dom.Response
 import org.scalajs.dom.html
 import zio.json._
 
+import com.raquo.waypoint._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.scalajs.js
 import org.scalajs.dom.URLSearchParams
@@ -30,17 +32,19 @@ val tokenLabel = "access_token"
 lazy val oauthClientCred =
   Var(initial = Option(dom.window.localStorage.getItem(tokenLabel)))
 
-def oauth2TokenInLocalStorage = {
+def parseAndStoreOauth2Token = {
   Option(
     URLSearchParams(dom.window.location.hash).get(tokenLabel)
   ) foreach {
     dom.window.localStorage.setItem(tokenLabel, _)
   }
+  router.replaceState(EmailPage)
 }
 
 def logout = {
   dom.window.localStorage.removeItem(tokenLabel)
   oauthClientCred.set(None)
+  router.replaceState(LoginPage)
 }
 
 val defaultApiUrl: ApiUrlPrefix = ApiUrlPrefix("http://localhost:8080")
@@ -60,9 +64,7 @@ def getEmailDto = SendEmailDto(
     subjectTemplate = subjectTemplate.now(),
     bodyTemplate = bodyTemplate.now()
   ),
-  Auth(accessToken =
-    oauthClientCred.now().getOrElse("")
-  ) // TODO: raise alert here
+  Auth(accessToken = oauthClientCred.now().get)
 )
 
 def fetchObserver = Observer[String](result => dom.window.alert(result))
@@ -96,7 +98,7 @@ def getLoginOauth2Link = {
   val requestBody = js.Dictionary(
     "client_id" -> oauth2ClientId,
     "response_type" -> "token",
-    "redirect_uri" -> dom.window.location.origin,
+    "redirect_uri" -> f"${dom.window.location.origin}/google/auth/callback",
     "scope" -> googleScope,
     "include_granted_scopes" -> "true",
     "state" -> "pass-through"
@@ -115,33 +117,31 @@ def processAuth() = {
     EventStream.empty
   }
 }
+def renderLoginPage =
+  a(
+    "Login",
+    className := "btn",
+    href := getLoginOauth2Link
+  )
 
-def rootElement = {
-  oauth2TokenInLocalStorage
+def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
+  if (oauthClientCred.now().isEmpty) {
+    router.replaceState(LoginPage)
+  }
 
   div(
     className := "container mx-auto",
     div(
       className := "flex flex-col",
       div(
-        className := "form-control",
-        a(
-          "Login",
-          className <-- oauthClientCred.toObservable.map(x =>
-            if x.isDefined then "btn hidden" else "btn"
-          ),
-          href := getLoginOauth2Link
-        )
+        className := "form-control"
       ),
       div(
         className := "form-control",
         button(
           "Logout",
-          hidden <-- oauthClientCred.toObservable.map(_.isEmpty),
           onClick --> (_ => logout),
-          className <-- oauthClientCred.toObservable.map(x =>
-            if x.isEmpty then "btn hidden" else "btn"
-          )
+          className := "btn"
         )
       ),
       div(
@@ -197,7 +197,72 @@ def rootElement = {
   )
 }
 
-@main def main = { // In most other examples, containerNode will be set to this behind the scenes
+import urldsl.vocabulary.UrlMatching
+import com.raquo.laminar.nodes.ReactiveHtmlElement
+import org.scalajs.dom.HTMLDivElement
+
+sealed trait Page {
+  def title: String
+}
+
+case object EmailPage extends Page {
+  def title = "Email"
+}
+
+case object LoginPage extends Page {
+  def title = "Login"
+}
+
+case object LoginCallbackPage extends Page {
+  def title = "Redirecting"
+}
+
+object Page {
+  given JsonDecoder[Page] = DeriveJsonDecoder.gen[Page]
+  given JsonEncoder[Page] = DeriveJsonEncoder.gen[Page]
+}
+
+val loginRoute = Route.static(LoginPage, root / "login" / endOfSegments)
+
+val loginCallbackPage = Route.static(
+  LoginCallbackPage,
+  root / "google" / "auth" / "callback" / endOfSegments
+)
+
+val emailRoute = Route.static(
+  EmailPage,
+  pattern = root / "email" / endOfSegments
+)
+
+val router = new Router[Page](
+  routes = List(emailRoute, loginRoute, loginCallbackPage),
+  getPageTitle = "Faisal Helper | " + _.title,
+  serializePage = page => page.toJson,
+  routeFallback = _ =>
+    if (oauthClientCred.now().isEmpty)
+      LoginPage
+    else EmailPage,
+  deserializePage = pageString => pageString.fromJson[Page].getOrElse(LoginPage)
+)(
+  popStateEvents = windowEvents(
+    _.onPopState
+  ),
+  owner = unsafeWindowOwner
+)
+
+def renderPages(page: Page) = page match {
+  case EmailPage => renderEmailPage
+  case LoginPage => renderLoginPage
+  case LoginCallbackPage =>
+    parseAndStoreOauth2Token
+    div()
+}
+
+val app: Div = div(
+  child <-- router.currentPageSignal.map(renderPages)
+)
+
+@main def main = {
   val containerNode = dom.document.querySelector("#app")
-  render(containerNode, rootElement)
+  renderOnDomContentLoaded(containerNode, app)
 }

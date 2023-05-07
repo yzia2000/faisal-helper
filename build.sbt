@@ -68,7 +68,8 @@ lazy val web = project
     libraryDependencies ++= Seq(
       "dev.zio" %%% "zio-json" % "0.5.0",
       "com.raquo" %%% "laminar" % "15.0.1",
-      "org.scala-js" %%% "scalajs-dom" % "2.4.0"
+      "org.scala-js" %%% "scalajs-dom" % "2.4.0",
+      "com.raquo" %%% "waypoint" % "6.0.0"
     )
   )
   .dependsOn(shared)
