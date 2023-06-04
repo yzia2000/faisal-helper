@@ -3,21 +3,10 @@ package faisalHelper.web
 import com.raquo.laminar.api.L.{_, given}
 import com.raquo.laminar.nodes.ReactiveHtmlElement
 import com.raquo.waypoint._
-import faisalHelper.shared.Auth
-import faisalHelper.shared.CsvInputReader
-import faisalHelper.shared.Endpoints
-import faisalHelper.shared.Endpoints.ApiUrlPrefix
-import faisalHelper.shared.Endpoints.getUrl
-import faisalHelper.shared.GeneratorInput
-import faisalHelper.shared.SendEmailDto
-import faisalHelper.shared.TemplateInput
+import faisalHelper.shared.*
+import faisalHelper.shared.Endpoints.*
 import org.scalajs.dom
-import org.scalajs.dom.File
-import org.scalajs.dom.FormData
-import org.scalajs.dom.HTMLDivElement
-import org.scalajs.dom.Response
-import org.scalajs.dom.URLSearchParams
-import org.scalajs.dom.html
+import org.scalajs.dom.*
 import urldsl.vocabulary.UrlMatching
 import zio.json._
 
@@ -173,7 +162,7 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
           className := "label",
           span(className := "label-text", "Attachment URL"),
           input(
-            className := "input input-bordered w-3/4",
+            className := "input input-bordered input-md w-3/4",
             placeholder := "Provide url to attachment that should be sent with email",
             onInput.mapToValue.map(_ match {
               case ""            => None
@@ -190,7 +179,7 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
           textArea(
             onMountFocus,
             className := "textarea textarea-bordered textarea-md w-3/4",
-            placeholder := "Enter template of subject eg:\nHi ${name}",
+            placeholder := "Enter template of subject eg:\nHi {name}",
             onInput.mapToValue --> subjectTemplate
           )
         )
@@ -203,7 +192,7 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
           textArea(
             onMountFocus,
             className := "textarea textarea-bordered textarea-md w-3/4",
-            placeholder := "Enter template of body eg:\nHi ${name} from ${company}. Would like to connect with you",
+            placeholder := "Enter template of body eg:\nHi {name} from {company}. Would like to connect with you",
             onInput.mapToValue --> bodyTemplate
           )
         )

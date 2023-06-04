@@ -23,9 +23,8 @@ object SendEmailDto {
 }
 
 case class GeneratorInput(
-    name: String,
-    company: String,
-    email: String
+    email: String,
+    placeholders: Map[String, String]
 )
 
 object GeneratorInput {
@@ -45,17 +44,19 @@ object TemplateInput {
 
 object CsvInputReader {
   def parseInput(data: String): List[GeneratorInput] = {
-    val lines = data.split("\n")
-
-    lines
-      .flatMap(line =>
-        line.split(",") match {
-          case Array(name, company, email) =>
-            Some(GeneratorInput(name, company, email))
-          case _ => None
+    data.split("\n").toList match {
+      case headerRow :: dataRows =>
+        val headers = headerRow.split(",")
+        dataRows.flatMap { row =>
+          val placeholders = headers.zip(row.split(",")).toMap
+          placeholders.get("email") match {
+            case Some(email) => Some(GeneratorInput(email, placeholders))
+            case _           => None
+          }
         }
-      )
-      .toList
+      case _ => List()
+    }
+
   }
 }
 
