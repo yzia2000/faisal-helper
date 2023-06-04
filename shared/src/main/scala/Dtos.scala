@@ -12,6 +12,7 @@ object Auth {
 
 case class SendEmailDto(
     recipients: List[GeneratorInput],
+    attachmentUrl: Option[String],
     templateInput: TemplateInput,
     auth: Auth
 )
@@ -58,4 +59,9 @@ object CsvInputReader {
   }
 }
 
-case class Email(to: String, subject: String, body: String)
+case class Email(
+    to: String,
+    subject: String,
+    body: String,
+    attachmentUrl: Option[String]
+)

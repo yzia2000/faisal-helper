@@ -19,6 +19,9 @@ import zio.stream.*
 
 import java.io.*
 import java.util.*
+import java.net.URL
+import jakarta.activation.DataHandler
+import jakarta.activation.URLDataSource
 
 object GmailEmailSender {
 
@@ -50,6 +53,28 @@ object GmailEmailSender {
       email: Email
   ) = {
     ZIO.attemptBlocking {
+      val attachmentPart = email.attachmentUrl.map { attachmentUrl =>
+        val part = new MimeBodyPart()
+        val url = new URL(
+          attachmentUrl
+        )
+        val uds = new URLDataSource(url)
+        part.setDataHandler(new DataHandler(uds))
+        part.setDisposition(Part.ATTACHMENT)
+        part.setFileName(
+          url.getFile().split("/").last
+        )
+        part
+      }
+
+      val messagePart = new MimeBodyPart()
+      messagePart.setText(email.body)
+
+      val multipart = new MimeMultipart()
+
+      multipart.addBodyPart(messagePart)
+      attachmentPart.foreach(multipart.addBodyPart)
+
       val session = Session.getDefaultInstance(new Properties(), null)
       val mimeMessage = new MimeMessage(session)
       mimeMessage.addRecipient(
@@ -57,7 +82,7 @@ object GmailEmailSender {
         new InternetAddress(email.to)
       )
       mimeMessage.setSubject(email.subject)
-      mimeMessage.setText(email.body)
+      mimeMessage.setContent(multipart)
 
       val buffer = new ByteArrayOutputStream();
       mimeMessage.writeTo(buffer);
@@ -76,7 +101,7 @@ object GmailEmailSender {
       _ <- ZIO.unit
       service = createGmailService(input.auth.accessToken)
       emails = input.recipients
-        .map(EmailGenerator.generate(input.templateInput))
+        .map(EmailGenerator.generate(input.templateInput, input.attachmentUrl))
       _ <- ZIO.foreach(emails)(x => sendEmail(service, x).ignore)
     } yield ()
   }

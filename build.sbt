@@ -1,6 +1,6 @@
 import org.scalajs.linker.interface.ModuleSplitStyle
 
-ThisBuild / scalaVersion := "3.2.2"
+ThisBuild / scalaVersion := "3.3.0"
 ThisBuild / connectInput := true
 
 Global / cancelable := true
@@ -24,6 +24,7 @@ lazy val api = project
   .enablePlugins(JavaAppPackaging)
   .settings(
     name := "faisal-helper-api",
+    scalacOptions += "-Wunused:all",
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % "2.0.13",
       "dev.zio" %% "zio-streams" % "2.0.13",

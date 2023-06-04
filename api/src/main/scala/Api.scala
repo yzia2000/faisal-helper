@@ -1,15 +1,9 @@
 package faisalHelper.api
 
 import faisalHelper.shared.*
-import jakarta.mail.*
-import jakarta.mail.internet.{InternetAddress, MimeMessage}
 import zio.*
 import zio.http.*
-import zio.http.HttpAppMiddleware.*
 import zio.json.*
-import zio.stream.*
-
-import java.util.Properties
 
 object Api {
 

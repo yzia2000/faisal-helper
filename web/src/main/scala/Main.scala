@@ -1,6 +1,8 @@
 package faisalHelper.web
 
 import com.raquo.laminar.api.L.{_, given}
+import com.raquo.laminar.nodes.ReactiveHtmlElement
+import com.raquo.waypoint._
 import faisalHelper.shared.Auth
 import faisalHelper.shared.CsvInputReader
 import faisalHelper.shared.Endpoints
@@ -11,21 +13,23 @@ import faisalHelper.shared.SendEmailDto
 import faisalHelper.shared.TemplateInput
 import org.scalajs.dom
 import org.scalajs.dom.File
+import org.scalajs.dom.FormData
+import org.scalajs.dom.HTMLDivElement
 import org.scalajs.dom.Response
+import org.scalajs.dom.URLSearchParams
 import org.scalajs.dom.html
+import urldsl.vocabulary.UrlMatching
 import zio.json._
-
-import com.raquo.waypoint._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.scalajs.js
-import org.scalajs.dom.URLSearchParams
 
 lazy val subjectTemplate = Var(initial = "")
 lazy val bodyTemplate = Var(initial = "")
 lazy val recipients = Var[List[GeneratorInput]](initial = List())
 lazy val email = Var(initial = "")
 lazy val password = Var(initial = "")
+lazy val attachment = Var[Option[String]](initial = None)
 
 val tokenLabel = "access_token"
 
@@ -60,6 +64,7 @@ val oauth2ClientId =
 
 def getEmailDto = SendEmailDto(
   recipients.now(),
+  attachment.now(),
   TemplateInput(
     subjectTemplate = subjectTemplate.now(),
     bodyTemplate = bodyTemplate.now()
@@ -166,6 +171,21 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
         className := "form-control",
         label(
           className := "label",
+          span(className := "label-text", "Attachment URL"),
+          input(
+            className := "input input-bordered w-3/4",
+            placeholder := "Provide url to attachment that should be sent with email",
+            onInput.mapToValue.map(_ match {
+              case ""            => None
+              case attachmentUrl => Some(attachmentUrl)
+            }) --> attachment
+          )
+        )
+      ),
+      div(
+        className := "form-control",
+        label(
+          className := "label",
           span(className := "label-text", "Subject Template"),
           textArea(
             onMountFocus,
@@ -196,10 +216,6 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
     )
   )
 }
-
-import urldsl.vocabulary.UrlMatching
-import com.raquo.laminar.nodes.ReactiveHtmlElement
-import org.scalajs.dom.HTMLDivElement
 
 sealed trait Page {
   def title: String
