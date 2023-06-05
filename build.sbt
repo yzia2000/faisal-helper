@@ -28,7 +28,7 @@ lazy val api = project
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % "2.0.13",
       "dev.zio" %% "zio-streams" % "2.0.13",
-      "dev.zio" %% "zio-http" % "3.0.0-RC1",
+      "dev.zio" %% "zio-http" % "3.0.0-RC2",
       "dev.zio" %% "zio-json" % "0.5.0",
       "com.google.apis" % "google-api-services-gmail" % "v1-rev110-1.25.0",
       "com.google.api-client" % "google-api-client" % "2.2.0",

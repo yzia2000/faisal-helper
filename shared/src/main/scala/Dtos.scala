@@ -5,6 +5,13 @@ import zio.json._
 
 case class Auth(accessToken: String)
 
+case class UserInfo(email: String, expires: Int)
+
+object UserInfo {
+  given JsonDecoder[UserInfo] = DeriveJsonDecoder.gen[UserInfo]
+  given JsonEncoder[UserInfo] = DeriveJsonEncoder.gen[UserInfo]
+}
+
 object Auth {
   given JsonDecoder[Auth] = DeriveJsonDecoder.gen[Auth]
   given JsonEncoder[Auth] = DeriveJsonEncoder.gen[Auth]

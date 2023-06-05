@@ -18,6 +18,7 @@ object Main extends ZIOAppDefault {
       Server.defaultWith(config =>
         config
           .port(sys.env.getOrElse("PORT", "8080").toInt)
-      )
+      ),
+      Client.default
     )
 }

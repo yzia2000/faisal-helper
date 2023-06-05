@@ -17,4 +17,8 @@ object Endpoints {
   object Email {
     final val sendEmail: Endpoint = "email"
   }
+
+  object Authentication {
+    final val google: Endpoint = "googleAuth"
+  }
 }

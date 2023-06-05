@@ -22,8 +22,27 @@ lazy val attachment = Var[Option[String]](initial = None)
 
 val tokenLabel = "access_token"
 
-lazy val oauthClientCred =
+lazy val oauthAccessToken =
   Var(initial = Option(dom.window.localStorage.getItem(tokenLabel)))
+
+lazy val userInfo = Var[Option[UserInfo]](initial = None)
+
+lazy val authObserver =
+  Observer[Option[UserInfo]](userInfoOpt =>
+    userInfoOpt match {
+      case None => logout
+      case value @ Some(info) =>
+        userInfo.set(value)
+        EventStream
+          .delay((info.expires + 5) * 1000)
+          .addObserver(
+            Observer[Unit](_ => {
+              dom.window.alert("Session timed out")
+              logout
+            })
+          )(unsafeWindowOwner)
+    }
+  )
 
 def parseAndStoreOauth2Token = {
   Option(
@@ -36,7 +55,7 @@ def parseAndStoreOauth2Token = {
 
 def logout = {
   dom.window.localStorage.removeItem(tokenLabel)
-  oauthClientCred.set(None)
+  oauthAccessToken.set(None)
   router.replaceState(LoginPage)
 }
 
@@ -58,7 +77,16 @@ def getEmailDto = SendEmailDto(
     subjectTemplate = subjectTemplate.now(),
     bodyTemplate = bodyTemplate.now()
   ),
-  Auth(accessToken = oauthClientCred.now().get)
+  Auth(accessToken = oauthAccessToken.now().get)
+)
+
+def getPreviewEmailDto = getEmailDto.copy(recipients =
+  userInfo
+    .now()
+    .map(info =>
+      recipients.now().headOption.toList.map(_.copy(email = info.email))
+    )
+    .getOrElse(List())
 )
 
 def fetchObserver = Observer[String](result => dom.window.alert(result))
@@ -83,9 +111,11 @@ def sendEmail(data: SendEmailDto) = {
       data = data.toJson
     )
     .map(_.response.toString)
+    .recover { case x: Throwable => Some(x.getMessage()) }
 }
 
-val googleScope = "https://www.googleapis.com/auth/gmail.send"
+val googleScope =
+  "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.send"
 
 def getLoginOauth2Link = {
   val oauth2Endpoint = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -102,15 +132,29 @@ def getLoginOauth2Link = {
   url
 }
 
-def processAuth() = {
-  if (oauthClientCred.now().isEmpty) {
-    oauthClientCred.set(Option("Logged In"))
-    EventStream.empty
-  } else {
-    oauthClientCred.set(None)
-    EventStream.empty
+def checkAuthorized = {
+  oauthAccessToken.now() match {
+    case None => EventStream.empty
+    case Some(accessToken) =>
+      AjaxStream
+        .get(
+          url = Endpoints.Authentication.google.getUrl,
+          headers = Map("Authorization" -> s"Bearer $accessToken")
+        )
+        .map(_.responseText)
+        // TODO: please make this less disgusting
+        .recover { case _: Throwable =>
+          Some("")
+        }
+        .map(_.fromJson[UserInfo])
+        .collect {
+          case Right(userInfo) =>
+            Some(userInfo)
+          case _ => None
+        }
   }
 }
+
 def renderLoginPage =
   a(
     "Login",
@@ -119,11 +163,8 @@ def renderLoginPage =
   )
 
 def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
-  if (oauthClientCred.now().isEmpty) {
-    router.replaceState(LoginPage)
-  }
-
   div(
+    onMountBind(_ => (checkAuthorized --> authObserver)),
     className := "container mx-auto",
     div(
       className := "flex flex-col",
@@ -177,7 +218,6 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
           className := "label",
           span(className := "label-text", "Subject Template"),
           textArea(
-            onMountFocus,
             className := "textarea textarea-bordered textarea-md w-3/4",
             placeholder := "Enter template of subject eg:\nHi {name}",
             onInput.mapToValue --> subjectTemplate
@@ -190,12 +230,21 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
           className := "label",
           span(className := "label-text", "Body Template"),
           textArea(
-            onMountFocus,
             className := "textarea textarea-bordered textarea-md w-3/4",
             placeholder := "Enter template of body eg:\nHi {name} from {company}. Would like to connect with you",
             onInput.mapToValue --> bodyTemplate
           )
         )
+      ),
+      button(
+        child.text <-- userInfo.toObservable.map(x =>
+          x match {
+            case Some(info) => s"Send me a preview @ ${info.email}!"
+            case _          => "Loading..."
+          }
+        ),
+        className := "btn",
+        onClick.flatMap(_ => sendEmail(getPreviewEmailDto)) --> fetchObserver
       ),
       button(
         "Submit",
@@ -244,7 +293,7 @@ val router = new Router[Page](
   getPageTitle = "Faisal Helper | " + _.title,
   serializePage = page => page.toJson,
   routeFallback = _ =>
-    if (oauthClientCred.now().isEmpty)
+    if (oauthAccessToken.now().isEmpty)
       LoginPage
     else EmailPage,
   deserializePage = pageString => pageString.fromJson[Page].getOrElse(LoginPage)
@@ -263,9 +312,11 @@ def renderPages(page: Page) = page match {
     div()
 }
 
-val app: Div = div(
-  child <-- router.currentPageSignal.map(renderPages)
-)
+val app: Div = {
+  div(
+    child <-- router.currentPageSignal.map(renderPages)
+  )
+}
 
 @main def main = {
   val containerNode = dom.document.querySelector("#app")
