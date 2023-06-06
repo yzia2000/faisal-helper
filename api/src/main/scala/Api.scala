@@ -11,7 +11,7 @@ object Api {
 
   // TODO: persist emails scheduled in a database so that user
   // can see which emails were sent in the past and which ones weren't.
-  val app: App[Queue[SendEmailDto] & Client] =
+  val app: App[Queue[(SendEmailDto, Option[FormField.Binary])] & Client] =
     Http.collectZIO[Request] {
       case req @ Method.GET -> Root / Endpoints.Authentication.google =>
         for {
@@ -35,15 +35,36 @@ object Api {
 
       case req @ Method.POST -> Root / Endpoints.Email.sendEmail =>
         for {
-          input <- req.body.asString
-            .flatMap(data => ZIO.fromEither(data.fromJson[SendEmailDto]))
+          form <- req.body.asMultipartForm.mapError(err =>
+            Response
+              .text(s"Failed to decode body json ${err}")
+              .withStatus(Status.BadRequest)
+          )
+          inputText <- ZIO
+            .fromOption(form.get("data"))
+            .flatMap(_.asText)
+            .mapError(err =>
+              Response
+                .text(s"Failed to decode body json ${err}")
+                .withStatus(Status.BadRequest)
+            )
+
+          file <- ZIO
+            .fromOption(form.get("attachment"))
+            .collect(None) { case file: FormField.Binary => file }
+            .option
+          input <- ZIO
+            .fromEither(
+              inputText
+                .fromJson[SendEmailDto]
+            )
             .mapError(err =>
               Response
                 .text(s"Failed to decode body json ${err}")
                 .withStatus(Status.BadRequest)
             )
           _ <- GmailEmailSender
-            .queueEmail(input)
+            .queueEmail(input, file)
             .mapError(err =>
               Response
                 .text(s"Failed to send emails ${err}")

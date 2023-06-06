@@ -8,9 +8,7 @@ import zio.http.HttpAppMiddleware.*
 object Main extends ZIOAppDefault {
   def run: ZIO[Any, Throwable, Nothing] = (Server
     .serve(
-      Api.app @@ cors() @@ requestLogging(
-        logResponseBody = true
-      )
+      Api.app @@ cors() @@ requestLogging()
     )
     .fork *> GmailEmailSender.emailProcessor *> ZIO.never)
     .provide(

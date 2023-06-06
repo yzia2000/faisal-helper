@@ -18,7 +18,8 @@ lazy val bodyTemplate = Var(initial = "")
 lazy val recipients = Var[List[GeneratorInput]](initial = List())
 lazy val email = Var(initial = "")
 lazy val password = Var(initial = "")
-lazy val attachment = Var[Option[String]](initial = None)
+lazy val attachmentUrl = Var[Option[String]](initial = None)
+lazy val attachmentFile = Var[Option[File]](initial = None)
 
 val tokenLabel = "access_token"
 
@@ -72,7 +73,7 @@ val oauth2ClientId =
 
 def getEmailDto = SendEmailDto(
   recipients.now(),
-  attachment.now(),
+  attachmentUrl.now(),
   TemplateInput(
     subjectTemplate = subjectTemplate.now(),
     bodyTemplate = bodyTemplate.now()
@@ -102,13 +103,25 @@ def parseFile(e: dom.Event): EventStream[String] = {
   }
 }
 
+def getFile(e: dom.Event): EventStream[Option[dom.File]] = {
+  e.target match {
+    case req: html.Input =>
+      EventStream.fromValue(req.files.headOption)
+    case _ =>
+      EventStream.empty
+  }
+}
+
 def logger[A]: Observer[A] = Observer[A](msg => dom.console.log(msg.toString))
 
 def sendEmail(data: SendEmailDto) = {
+  val formData = new FormData()
+  formData.append("data", data.toJson)
+  attachmentFile.now().foreach(file => formData.append("attachment", file))
   AjaxStream
     .post(
       Endpoints.Email.sendEmail.getUrl,
-      data = data.toJson
+      data = formData
     )
     .map(_.response.toString)
     .recover { case x: Throwable => Some(x.getMessage()) }
@@ -201,14 +214,13 @@ def renderEmailPage: ReactiveHtmlElement[HTMLDivElement] = {
         className := "form-control",
         label(
           className := "label",
-          span(className := "label-text", "Attachment URL"),
+          span(className := "label-text", "Attachment"),
           input(
-            className := "input input-bordered input-md w-3/4",
-            placeholder := "Provide url to attachment that should be sent with email",
-            onInput.mapToValue.map(_ match {
-              case ""            => None
-              case attachmentUrl => Some(attachmentUrl)
-            }) --> attachment
+            `type` := "file",
+            className := "file-input file-input-md",
+            onInput.flatMapStream(
+              getFile
+            ) --> attachmentFile
           )
         )
       ),

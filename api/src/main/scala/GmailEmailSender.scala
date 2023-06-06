@@ -19,6 +19,8 @@ import java.util.*
 import java.net.URL
 import jakarta.activation.DataHandler
 import jakarta.activation.URLDataSource
+import zio.http.FormField
+import jakarta.mail.util.ByteArrayDataSource
 
 object GmailEmailSender {
 
@@ -45,22 +47,18 @@ object GmailEmailSender {
       .build()
   }
 
-  def sendEmail(
+  def sendEmail(file: Option[FormField.Binary])(
       service: Gmail,
       email: Email
   ) = {
     ZIO.attemptBlocking {
-      val attachmentPart = email.attachmentUrl.map { attachmentUrl =>
+      val attachmentPart = file.map { file =>
         val part = new MimeBodyPart()
-        val url = new URL(
-          attachmentUrl
-        )
-        val uds = new URLDataSource(url)
+        val uds =
+          new ByteArrayDataSource(file.data.toArray, file.contentType.fullType)
         part.setDataHandler(new DataHandler(uds))
         part.setDisposition(Part.ATTACHMENT)
-        part.setFileName(
-          url.getFile().split("/").last
-        )
+        file.filename.foreach(part.setFileName)
         part
       }
 
@@ -93,33 +91,48 @@ object GmailEmailSender {
     }.logError *> ZIO.logInfo(s"Successfully sent email to ${email.to}")
   }
 
-  private def processEmails(input: SendEmailDto): ZIO[Any, Throwable, Unit] = {
+  private def processEmails(
+      input: SendEmailDto,
+      file: Option[FormField.Binary] = None
+  ): ZIO[Any, Throwable, Unit] = {
     for {
       _ <- ZIO.unit
       service = createGmailService(input.auth.accessToken)
+      emailSender = sendEmail(file)
       emails = input.recipients
         .map(EmailGenerator.generate(input.templateInput, input.attachmentUrl))
-      _ <- ZIO.foreach(emails)(x => sendEmail(service, x).ignore)
+      _ <- ZIO.foreach(emails)(x => emailSender(service, x).ignore)
     } yield ()
   }
 
-  def emailProcessor: ZIO[zio.Queue[SendEmailDto], Throwable, Unit] = for {
-    queue <- ZIO.service[zio.Queue[SendEmailDto]]
+  def emailProcessor: ZIO[zio.Queue[
+    (SendEmailDto, Option[FormField.Binary])
+  ], Throwable, Unit] = for {
+    queue <- ZIO.service[zio.Queue[(SendEmailDto, Option[FormField.Binary])]]
     // TODO: add retry support
     _ <- ZStream
       .fromQueue(queue)
-      .foreach(processEmails)
+      .foreach { case (emails, attachment) =>
+        processEmails(emails, attachment)
+      }
   } yield ()
 
   def queueEmail(
-      emails: SendEmailDto
-  ): ZIO[zio.Queue[SendEmailDto], Throwable, Unit] = {
+      emails: SendEmailDto,
+      attachment: Option[FormField.Binary] = None
+  ): ZIO[zio.Queue[
+    (SendEmailDto, Option[FormField.Binary])
+  ], Throwable, Unit] = {
     for {
-      queue <- ZIO.service[zio.Queue[SendEmailDto]]
-      _ <- queue.offer(emails)
+      queue <- ZIO.service[zio.Queue[(SendEmailDto, Option[FormField.Binary])]]
+      _ <- queue.offer((emails, attachment))
     } yield ()
   }
 
-  def queueLayer: ZLayer[Any, Nothing, zio.Queue[SendEmailDto]] =
-    ZLayer.fromZIO(zio.Queue.bounded[SendEmailDto](10))
+  def queueLayer: ZLayer[Any, Nothing, zio.Queue[
+    (SendEmailDto, Option[FormField.Binary])
+  ]] =
+    ZLayer.fromZIO(
+      zio.Queue.bounded[(SendEmailDto, Option[FormField.Binary])](10)
+    )
 }
